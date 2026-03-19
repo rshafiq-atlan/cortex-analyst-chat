@@ -21,8 +21,6 @@ from typing import Dict, Any
 from dotenv import load_dotenv
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
-from pyatlan.client.atlan import AtlanClient
-from pyatlan.model.assets import Asset
 
 load_dotenv()
 
@@ -243,55 +241,99 @@ def index():
 
 @app.route("/api/space/<space_guid>")
 def get_space_info(space_guid):
-    """Look up an Atlan asset by GUID, read custom metadata."""
+    """Look up an Atlan asset by GUID via Atlan REST API, read custom metadata."""
     if not ATLAN_API_TOKEN:
         return jsonify({"success": False, "error": "Atlan API not configured."})
 
     try:
-        client = AtlanClient(base_url=ATLAN_HOST, api_key=ATLAN_API_TOKEN)
-        asset = client.asset.get_by_guid(guid=space_guid, asset_type=Asset)
+        # ── Step 1: Resolve the CM typedef to get attribute ID mappings ──
+        # Atlan stores custom metadata under business-metadata typedefs.
+        # We need to find the attribute IDs for "Cortex Analyst Details".
+        typedef_resp = http_requests.get(
+            f"{ATLAN_HOST}/api/meta/types/typedefs?type=business_metadata",
+            headers={
+                "Authorization": f"Bearer {ATLAN_API_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            timeout=15,
+        )
+        typedef_resp.raise_for_status()
 
-        cortex_meta = asset.get_custom_metadata(name="Cortex Analyst Details")
+        # Build a map: attribute display name -> attribute internal name
+        cm_attr_map = {}  # internal_name -> display_name
+        cm_typedef_name = None
+        for td in typedef_resp.json().get("businessMetadataDefs", []):
+            if td.get("displayName") == "Cortex Analyst Details":
+                cm_typedef_name = td["name"]
+                for attr in td.get("attributeDefs", []):
+                    cm_attr_map[attr["name"]] = attr.get("displayName", attr["name"])
+                break
 
-        if cortex_meta:
-            fqn = cortex_meta.get("fullyQualifiedName", "")
-            view_name = cortex_meta.get("semanticViewName", asset.name or "")
-            db = cortex_meta.get("database", "")
-            schema = cortex_meta.get("schema", "")
-            table_count = cortex_meta.get("tableCount", 0)
-            metric_count = cortex_meta.get("metricCount", 0)
-            dim_count = cortex_meta.get("dimensionCount", 0)
+        # ── Step 2: Get the asset by GUID ────────────────────────────────
+        asset_resp = http_requests.get(
+            f"{ATLAN_HOST}/api/meta/entity/guid/{space_guid}",
+            params={"minExtInfo": "false", "ignoreRelationships": "true"},
+            headers={
+                "Authorization": f"Bearer {ATLAN_API_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            timeout=15,
+        )
+        asset_resp.raise_for_status()
+        entity = asset_resp.json().get("entity", {})
+        attrs = entity.get("attributes", {})
+        biz_attrs = entity.get("businessAttributes", {})
 
-            acct_path = SNOWFLAKE_ACCOUNT.lower().replace("-", "/")
-            sf_url = (
-                f"https://app.snowflake.com/{acct_path}/"
-                f"#/cortex/analyst/databases/{db}/schemas/{schema}/"
-                f"semanticView/{view_name}/edit"
-            )
+        # ── Step 3: Extract Cortex Analyst Details ───────────────────────
+        cortex_raw = biz_attrs.get(cm_typedef_name, {}) if cm_typedef_name else {}
 
-            return jsonify({
-                "success": True,
-                "semantic_view_fqn": fqn,
-                "name": view_name,
-                "description": (
-                    asset.description
-                    or asset.user_description
-                    or f"Cortex Analyst semantic view with {table_count} tables, "
-                       f"{dim_count} dimensions, {metric_count} metrics"
-                ),
-                "database": db,
-                "schema": schema,
-                "table_count": table_count,
-                "metric_count": metric_count,
-                "dimension_count": dim_count,
-                "snowflake_url": sf_url,
-            })
-        else:
+        if not cortex_raw:
             return jsonify({
                 "success": False,
                 "error": "No 'Cortex Analyst Details' custom metadata found.",
-                "debug": {"asset_name": asset.name},
+                "debug": {"asset_name": attrs.get("name")},
             })
+
+        # Remap internal attribute names to display names
+        cortex_meta = {}
+        for internal_name, value in cortex_raw.items():
+            display = cm_attr_map.get(internal_name, internal_name)
+            cortex_meta[display] = value
+
+        fqn = cortex_meta.get("fullyQualifiedName", "")
+        view_name = cortex_meta.get("semanticViewName", attrs.get("name", ""))
+        db = cortex_meta.get("database", "")
+        schema = cortex_meta.get("schema", "")
+        table_count = cortex_meta.get("tableCount", 0)
+        metric_count = cortex_meta.get("metricCount", 0)
+        dim_count = cortex_meta.get("dimensionCount", 0)
+
+        acct_path = SNOWFLAKE_ACCOUNT.lower().replace("-", "/")
+        sf_url = (
+            f"https://app.snowflake.com/{acct_path}/"
+            f"#/cortex/analyst/databases/{db}/schemas/{schema}/"
+            f"semanticView/{view_name}/edit"
+        )
+
+        description = (
+            attrs.get("description")
+            or attrs.get("userDescription")
+            or f"Cortex Analyst semantic view with {table_count} tables, "
+               f"{dim_count} dimensions, {metric_count} metrics"
+        )
+
+        return jsonify({
+            "success": True,
+            "semantic_view_fqn": fqn,
+            "name": view_name,
+            "description": description,
+            "database": db,
+            "schema": schema,
+            "table_count": table_count,
+            "metric_count": metric_count,
+            "dimension_count": dim_count,
+            "snowflake_url": sf_url,
+        })
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})

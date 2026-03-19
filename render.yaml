@@ -6,7 +6,7 @@ services:
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: PYTHON_VERSION
-        value: "3.13.0"
+        value: "3.11.0"
       - key: SNOWFLAKE_ACCOUNT
       - key: SNOWFLAKE_USER
       - key: SNOWFLAKE_PRIVATE_KEY
