@@ -83,8 +83,10 @@ class SnowflakeSession:
                 if SNOWFLAKE_PRIVATE_KEY_PASSPHRASE
                 else None
             )
+            # Render stores env vars as single-line strings — restore PEM newlines
+            pem = SNOWFLAKE_PRIVATE_KEY.replace("\\n", "\n")
             p_key = serialization.load_pem_private_key(
-                SNOWFLAKE_PRIVATE_KEY.encode(),
+                pem.encode(),
                 password=passphrase,
             )
             pkb = p_key.private_bytes(
