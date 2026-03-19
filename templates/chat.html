@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cortex Analyst Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #29B5E8 0%, #0D47A1 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255,255,255,0.97);
+            padding: 12px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #29B5E8, #0D47A1);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: white;
+        }
+
+        .space-info h1 { font-size: 16px; color: #1a1a2e; }
+
+        .space-info .status {
+            font-size: 11px; color: #666;
+            display: flex; align-items: center; gap: 5px; margin-top: 2px;
+        }
+
+        .status-dot {
+            width: 7px; height: 7px;
+            background: #10b981; border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        .sf-link {
+            background: #29B5E8; color: white;
+            padding: 7px 14px; border-radius: 6px;
+            text-decoration: none; font-size: 12px; font-weight: 500;
+            display: flex; align-items: center; gap: 5px;
+            transition: background 0.2s;
+        }
+        .sf-link:hover { background: #1a9fd4; }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 500;
+            margin-left: 8px;
+        }
+        .badge-tables { background: #e0f2fe; color: #0369a1; }
+        .badge-metrics { background: #fce7f3; color: #be185d; }
+        .badge-dims { background: #ecfdf5; color: #047857; }
+
+        .chat-container {
+            flex: 1; display: flex; flex-direction: column;
+            background: white;
+            margin: 16px; border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .messages {
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 14px;
+        }
+
+        .message {
+            display: flex; gap: 10px;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity:0; transform:translateY(8px); }
+            to { opacity:1; transform:translateY(0); }
+        }
+
+        .message.user { flex-direction: row-reverse; }
+
+        .message-avatar {
+            width: 30px; height: 30px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; flex-shrink: 0;
+        }
+        .message.user .message-avatar { background: #29B5E8; color: white; }
+        .message.assistant .message-avatar { background: #f0f4f8; }
+
+        .message-content {
+            max-width: 75%; padding: 11px 15px;
+            border-radius: 12px; font-size: 13.5px; line-height: 1.5;
+        }
+        .message.user .message-content {
+            background: #29B5E8; color: white;
+            border-bottom-right-radius: 4px;
+        }
+        .message.assistant .message-content {
+            background: #f0f4f8; color: #1a1a2e;
+            border-bottom-left-radius: 4px;
+        }
+
+        .sql-block {
+            margin-top: 10px; padding: 12px;
+            background: #1e293b; color: #e2e8f0;
+            border-radius: 8px;
+            font-family: 'SF Mono','Monaco','Menlo', monospace;
+            font-size: 12px; line-height: 1.6;
+            overflow-x: auto; white-space: pre-wrap;
+            position: relative;
+        }
+
+        .sql-block .copy-btn {
+            position: absolute; top: 6px; right: 6px;
+            background: #334155; color: #94a3b8;
+            border: none; border-radius: 4px;
+            padding: 3px 8px; font-size: 11px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .sql-block .copy-btn:hover { background: #475569; color: #e2e8f0; }
+
+        .suggestions {
+            display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+        }
+        .suggestion-chip {
+            display: inline-block; padding: 6px 12px;
+            background: white; border: 1px solid #d1d5db;
+            border-radius: 16px; font-size: 12px;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .suggestion-chip:hover { background: #f0f9ff; border-color: #29B5E8; }
+
+        .typing-indicator { display: flex; gap: 4px; padding: 14px; }
+        .typing-dot {
+            width: 7px; height: 7px; background: #9ca3af;
+            border-radius: 50%; animation: typing 1.4s infinite;
+        }
+        .typing-dot:nth-child(2) { animation-delay:0.2s; }
+        .typing-dot:nth-child(3) { animation-delay:0.4s; }
+        @keyframes typing {
+            0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-8px)}
+        }
+
+        .input-container {
+            padding: 16px 20px;
+            border-top: 1px solid #e5e7eb;
+            background: #fafbfc;
+        }
+        .input-form { display: flex; gap: 10px; }
+        .input-field {
+            flex: 1; padding: 11px 14px;
+            border: 2px solid #e5e7eb; border-radius: 8px;
+            font-size: 13.5px; outline: none; transition: border-color 0.2s;
+        }
+        .input-field:focus { border-color: #29B5E8; }
+
+        .send-button {
+            padding: 11px 22px;
+            background: #29B5E8; color: white; border: none;
+            border-radius: 8px; font-size: 13.5px; font-weight: 500;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .send-button:hover { background: #1a9fd4; }
+        .send-button:disabled { background: #9ca3af; cursor: not-allowed; }
+
+        .welcome-message { text-align: center; padding: 36px; color: #6b7280; }
+        .welcome-message h2 { color: #1a1a2e; margin-bottom: 8px; font-size: 18px; }
+        .welcome-message p { font-size: 13.5px; margin-bottom: 4px; }
+
+        .sample-questions { margin-top: 18px; }
+        .sample-question {
+            display: inline-block; margin: 5px; padding: 8px 14px;
+            background: #f0f4f8; border-radius: 8px; font-size: 13px;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .sample-question:hover { background: #e0f2fe; }
+
+        .loading-message { text-align: center; padding: 36px; color: #666; }
+        .loading-spinner {
+            display: inline-block; width: 18px; height: 18px;
+            border: 2px solid #f3f3f3; border-top: 2px solid #29B5E8;
+            border-radius: 50%; animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+
+        /* Data table */
+        .data-table-wrapper {
+            margin-top: 10px; overflow-x: auto;
+            border-radius: 8px; border: 1px solid #e2e8f0;
+        }
+        .data-table {
+            width: 100%; border-collapse: collapse;
+            font-size: 12px; font-family: 'SF Mono','Monaco','Menlo', monospace;
+        }
+        .data-table th {
+            background: #f1f5f9; color: #475569; font-weight: 600;
+            padding: 8px 12px; text-align: left;
+            border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+        }
+        .data-table td {
+            padding: 6px 12px; border-bottom: 1px solid #f1f5f9;
+            white-space: nowrap; max-width: 250px; overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .data-table tr:hover td { background: #f8fafc; }
+        .data-table .row-count {
+            padding: 6px 12px; color: #94a3b8; font-size: 11px;
+            font-style: italic;
+        }
+
+        /* View picker (standalone mode) */
+        .view-picker {
+            display: flex; flex-wrap: wrap; gap: 10px;
+            justify-content: center; margin-top: 18px;
+        }
+        .view-card {
+            background: white; border: 2px solid #e5e7eb; border-radius: 10px;
+            padding: 14px 18px; cursor: pointer; transition: all 0.2s;
+            text-align: left; min-width: 200px; max-width: 280px;
+        }
+        .view-card:hover { border-color: #29B5E8; box-shadow: 0 2px 8px rgba(41,181,232,0.15); }
+        .view-card h3 { font-size: 13px; color: #1a1a2e; margin-bottom: 4px; }
+        .view-card p { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
+        .view-card .view-stats { font-size: 10px; color: #9ca3af; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="logo">CA</div>
+            <div class="space-info">
+                <h1 id="spaceName">Cortex Analyst</h1>
+                <div class="status">
+                    <span class="status-dot"></span>
+                    <span id="statusText">Waiting for context...</span>
+                    <span id="badges"></span>
+                </div>
+            </div>
+        </div>
+        <a id="sfLink" href="#" target="_blank" class="sf-link" style="display:none;">
+            <span>Open in Snowflake</span>
+        </a>
+    </div>
+
+    <div class="chat-container">
+        <div id="messages" class="messages">
+            <div class="loading-message" id="loadingMessage">
+                <div class="loading-spinner"></div>
+                <div>Waiting for semantic view context from Atlan...</div>
+                <div style="margin-top:8px;font-size:12px;">
+                    Select a Cortex Analyst asset in Atlan to start chatting
+                </div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <form id="chatForm" class="input-form" style="display:none;">
+                <input type="text" id="messageInput" class="input-field"
+                    placeholder="Ask a question about your data..."
+                    autocomplete="off" />
+                <button type="submit" class="send-button">Send</button>
+            </form>
+        </div>
+    </div>
+
+<script>
+    let currentViewFqn = null;
+    let conversationHistory = [];
+    let isConfigured = undefined;
+    let handshakeReceived = false;
+
+    // ── Config check ─────────────────────────────────────────────────
+    async function checkConfiguration() {
+        try {
+            const resp = await fetch('/api/config');
+            const data = await resp.json();
+            isConfigured = data.configured;
+            if (!isConfigured) {
+                document.getElementById('loadingMessage').innerHTML = `
+                    <div style="color:#c00;">
+                        <h3>Configuration Required</h3>
+                        <p style="margin-top:8px;">Snowflake credentials not configured. Set in .env:</p>
+                        <ul style="text-align:left;display:inline-block;margin-top:8px;">
+                            <li>SNOWFLAKE_ACCOUNT</li>
+                            <li>SNOWFLAKE_USER</li>
+                            <li>SNOWFLAKE_PASSWORD</li>
+                        </ul>
+                    </div>`;
+            }
+            return isConfigured;
+        } catch (e) {
+            isConfigured = false;
+            return false;
+        }
+    }
+
+    // ── Atlan postMessage listener ───────────────────────────────────
+    window.addEventListener('message', async (event) => {
+        if (!event.data || typeof event.data !== 'object') return;
+
+        const allowedOrigins = [
+            'https://home.atlan.com',
+            'https://partner-sandbox.atlan.com',
+            'http://localhost:3001',
+            window.location.origin,
+        ];
+        if (!allowedOrigins.includes(event.origin) && event.origin !== window.location.origin) return;
+
+        const { type, payload } = event.data;
+
+        if (type === 'ATLAN_HANDSHAKE') {
+            handshakeReceived = true;
+            window.parent.postMessage({ type: 'IFRAME_READY', payload: { ready: true } }, event.origin);
+            if (isConfigured === undefined) checkConfiguration();
+        }
+
+        else if (type === 'ATLAN_AUTH_CONTEXT') {
+            if (payload && payload.page && payload.page.params && payload.page.params.id) {
+                const guid = payload.page.params.id;
+                if (isConfigured === undefined) await checkConfiguration();
+                await loadSpace(guid);
+            } else {
+                document.getElementById('loadingMessage').innerHTML = `
+                    <div style="color:#c00;">
+                        <h3>Invalid Context</h3>
+                        <p style="margin-top:8px;">No asset GUID received. Select a Cortex Analyst asset in Atlan.</p>
+                    </div>`;
+            }
+        }
+
+        else if (type === 'ATLAN_LOGOUT') {
+            currentViewFqn = null;
+            conversationHistory = [];
+            document.getElementById('messages').innerHTML =
+                '<div class="loading-message">Session ended. Refresh to continue.</div>';
+            document.getElementById('chatForm').style.display = 'none';
+        }
+    });
+
+    // ── Load space (asset) ───────────────────────────────────────────
+    async function loadSpace(guid, retryCount = 0) {
+        if (isConfigured === undefined) await checkConfiguration();
+        if (!isConfigured) return;
+
+        try {
+            const resp = await fetch(`/api/space/${guid}`);
+            const data = await resp.json();
+
+            if (data.success) {
+                currentViewFqn = data.semantic_view_fqn;
+                conversationHistory = [];
+
+                document.getElementById('spaceName').textContent = data.name;
+                document.getElementById('statusText').textContent = 'Connected';
+
+                // Badges
+                const badgesEl = document.getElementById('badges');
+                badgesEl.innerHTML = '';
+                if (data.table_count) badgesEl.innerHTML +=
+                    `<span class="badge badge-tables">${data.table_count} tables</span>`;
+                if (data.dimension_count) badgesEl.innerHTML +=
+                    `<span class="badge badge-dims">${data.dimension_count} dims</span>`;
+                if (data.metric_count) badgesEl.innerHTML +=
+                    `<span class="badge badge-metrics">${data.metric_count} metrics</span>`;
+
+                // Snowflake link
+                if (data.snowflake_url) {
+                    document.getElementById('sfLink').href = data.snowflake_url;
+                    document.getElementById('sfLink').style.display = 'flex';
+                }
+
+                // Welcome
+                document.getElementById('messages').innerHTML = `
+                    <div class="welcome-message">
+                        <h2>${data.name}</h2>
+                        <p>${data.description}</p>
+                        <div class="sample-questions">
+                            <div class="sample-question" onclick="askQuestion('What are the total sales?')">
+                                What are the total sales?
+                            </div>
+                            <div class="sample-question" onclick="askQuestion('Show me top 10 customers by revenue')">
+                                Top 10 customers by revenue
+                            </div>
+                            <div class="sample-question" onclick="askQuestion('What are the trends over time?')">
+                                What are the trends over time?
+                            </div>
+                        </div>
+                    </div>`;
+
+                document.getElementById('chatForm').style.display = 'flex';
+                document.getElementById('messageInput').focus();
+            } else {
+                document.getElementById('loadingMessage').innerHTML =
+                    `<div style="color:#c00;">${data.error}</div>`;
+            }
+        } catch (error) {
+            if (retryCount < 2 && error.name === 'TypeError') {
+                setTimeout(() => loadSpace(guid, retryCount + 1), 1000);
+            } else {
+                document.getElementById('loadingMessage').innerHTML = `
+                    <div style="color:#c00;">
+                        <h3>Failed to load</h3>
+                        <p style="margin-top:8px;">${error.message}</p>
+                        <button onclick="location.reload()" style="
+                            margin-top:12px;padding:8px 18px;background:#29B5E8;
+                            color:white;border:none;border-radius:6px;cursor:pointer;
+                        ">Refresh</button>
+                    </div>`;
+            }
+        }
+    }
+
+    // ── Chat helpers ─────────────────────────────────────────────────
+    function askQuestion(q) {
+        document.getElementById('messageInput').value = q;
+        document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+    }
+
+    function addMessage(content, isUser, sql = null, suggestions = [], data = null) {
+        const messagesDiv = document.getElementById('messages');
+        const welcome = messagesDiv.querySelector('.welcome-message');
+        if (welcome) welcome.remove();
+        const loading = messagesDiv.querySelector('.loading-message');
+        if (loading) loading.remove();
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.textContent = isUser ? 'You' : 'CA';
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        contentDiv.textContent = content;
+
+        if (sql) {
+            const sqlDiv = document.createElement('div');
+            sqlDiv.className = 'sql-block';
+            sqlDiv.textContent = sql;
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.textContent = 'Copy';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(sql);
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+            };
+            sqlDiv.appendChild(copyBtn);
+            contentDiv.appendChild(sqlDiv);
+        }
+
+        if (data && data.columns && data.rows && data.rows.length > 0) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'data-table-wrapper';
+            const table = document.createElement('table');
+            table.className = 'data-table';
+
+            // Header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            data.columns.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Body (show up to 20 rows inline)
+            const tbody = document.createElement('tbody');
+            const showRows = data.rows.slice(0, 20);
+            showRows.forEach(row => {
+                const tr = document.createElement('tr');
+                row.forEach(val => {
+                    const td = document.createElement('td');
+                    td.textContent = val === null ? 'NULL' : val;
+                    td.title = val === null ? 'NULL' : String(val);
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            // Row count footer
+            if (data.row_count > 20) {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = data.columns.length;
+                td.className = 'row-count';
+                td.textContent = `Showing 20 of ${data.row_count.toLocaleString()} rows`;
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+            }
+
+            table.appendChild(tbody);
+            wrapper.appendChild(table);
+            contentDiv.appendChild(wrapper);
+        }
+
+        if (suggestions && suggestions.length > 0) {
+            const sugDiv = document.createElement('div');
+            sugDiv.className = 'suggestions';
+            suggestions.forEach(s => {
+                const chip = document.createElement('span');
+                chip.className = 'suggestion-chip';
+                chip.textContent = s;
+                chip.onclick = () => askQuestion(s);
+                sugDiv.appendChild(chip);
+            });
+            contentDiv.appendChild(sugDiv);
+        }
+
+        msgDiv.appendChild(avatar);
+        msgDiv.appendChild(contentDiv);
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function showTyping() {
+        const messagesDiv = document.getElementById('messages');
+        const t = document.createElement('div');
+        t.id = 'typing';
+        t.className = 'message assistant';
+        t.innerHTML = `
+            <div class="message-avatar">CA</div>
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>`;
+        messagesDiv.appendChild(t);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function hideTyping() {
+        const t = document.getElementById('typing');
+        if (t) t.remove();
+    }
+
+    // ── Form submission ──────────────────────────────────────────────
+    document.getElementById('chatForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('messageInput');
+        const message = input.value.trim();
+        if (!message || !currentViewFqn) return;
+
+        addMessage(message, true);
+        input.value = '';
+        input.disabled = true;
+        showTyping();
+
+        try {
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    semantic_view_fqn: currentViewFqn,
+                    message: message,
+                    history: conversationHistory,
+                }),
+            });
+
+            const data = await resp.json();
+            hideTyping();
+
+            if (data.success) {
+                // Update conversation history for multi-turn
+                conversationHistory.push({
+                    role: 'user',
+                    content: [{ type: 'text', text: message }],
+                });
+                if (data.assistant_message) {
+                    conversationHistory.push(data.assistant_message);
+                }
+
+                addMessage(
+                    data.response || 'Query generated',
+                    false,
+                    data.sql,
+                    data.suggestions || [],
+                    data.data || null
+                );
+            } else {
+                addMessage(`Error: ${data.error}`, false);
+            }
+        } catch (error) {
+            hideTyping();
+            addMessage(`Error: ${error.message}`, false);
+        } finally {
+            input.disabled = false;
+            input.focus();
+        }
+    });
+
+    // ── Init ─────────────────────────────────────────────────────────
+    checkConfiguration();
+
+    setTimeout(() => {
+        if (!handshakeReceived) {
+            const parentOrigin = document.referrer
+                ? new URL(document.referrer).origin
+                : 'https://partner-sandbox.atlan.com';
+            window.parent.postMessage({ type: 'IFRAME_READY', payload: { ready: true } }, parentOrigin);
+        }
+    }, 500);
+
+    // Standalone mode: show view picker, or direct to a specific view with ?fqn=...
+    function selectView(name, fqn, description) {
+        currentViewFqn = fqn;
+        conversationHistory = [];
+        document.getElementById('spaceName').textContent = name;
+        document.getElementById('statusText').textContent = 'Connected';
+        document.getElementById('messages').innerHTML = `
+            <div class="welcome-message">
+                <h2>${name}</h2>
+                <p>${description}</p>
+                <div style="margin-top:8px;">
+                    <button onclick="showViewPicker()" style="
+                        background:none;border:1px solid #d1d5db;border-radius:6px;
+                        padding:5px 12px;font-size:12px;cursor:pointer;color:#6b7280;
+                    ">Switch view</button>
+                </div>
+                <div class="sample-questions">
+                    <div class="sample-question" onclick="askQuestion('What are the total sales?')">What are the total sales?</div>
+                    <div class="sample-question" onclick="askQuestion('Show me top 10 customers by revenue')">Top 10 customers by revenue</div>
+                    <div class="sample-question" onclick="askQuestion('What are the trends over time?')">Trends over time</div>
+                </div>
+            </div>`;
+        document.getElementById('chatForm').style.display = 'flex';
+        document.getElementById('messageInput').focus();
+    }
+
+    async function showViewPicker() {
+        try {
+            const resp = await fetch('/api/views');
+            const data = await resp.json();
+            if (!data.success) return;
+
+            let cardsHtml = '';
+            data.views.forEach(v => {
+                cardsHtml += `
+                    <div class="view-card" onclick="selectView('${v.name}', '${v.fqn}', '${v.description}')">
+                        <h3>${v.name}</h3>
+                        <p>${v.description}</p>
+                        <div class="view-stats">${v.tables} tables · ${v.dims} dims · ${v.metrics} metrics</div>
+                    </div>`;
+            });
+
+            document.getElementById('messages').innerHTML = `
+                <div class="welcome-message">
+                    <h2>Select a Semantic View</h2>
+                    <p>Choose which Cortex Analyst semantic view to query</p>
+                    <div class="view-picker">${cardsHtml}</div>
+                </div>`;
+            document.getElementById('chatForm').style.display = 'none';
+        } catch (e) {
+            console.error('Failed to load views:', e);
+        }
+    }
+
+    // Auto-detect mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const directFqn = urlParams.get('fqn');
+
+    if (directFqn) {
+        // Direct link to a specific view
+        setTimeout(() => selectView(directFqn.split('.').pop(), directFqn, ''), 500);
+    } else if (window === window.parent) {
+        // Not in an iframe — standalone mode, show view picker
+        setTimeout(async () => {
+            const configured = await checkConfiguration();
+            if (configured) showViewPicker();
+        }, 500);
+    }
+</script>
+</body>
+</html>
