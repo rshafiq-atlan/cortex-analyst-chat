@@ -8,20 +8,13 @@ services:
       - key: PYTHON_VERSION
         value: "3.13.0"
       - key: SNOWFLAKE_ACCOUNT
-        sync: false
       - key: SNOWFLAKE_USER
-        sync: false
       - key: SNOWFLAKE_PRIVATE_KEY
-        sync: false
       - key: SNOWFLAKE_PRIVATE_KEY_PASSPHRASE
-        sync: false
       - key: SNOWFLAKE_WAREHOUSE
-        sync: false
       - key: SNOWFLAKE_ROLE
-        sync: false
       - key: SNOWFLAKE_AUTHENTICATOR
-        value: keypair
+        value: "keypair"
       - key: ATLAN_HOST
-        value: https://partner-sandbox.atlan.com
+        value: "https://partner-sandbox.atlan.com"
       - key: ATLAN_API_TOKEN
-        sync: false
