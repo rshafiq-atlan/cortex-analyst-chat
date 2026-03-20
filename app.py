@@ -42,6 +42,7 @@ SNOWFLAKE_ROLE = os.getenv("SNOWFLAKE_ROLE", "")
 SNOWFLAKE_AUTHENTICATOR = os.getenv("SNOWFLAKE_AUTHENTICATOR", "snowflake")
 SNOWFLAKE_PRIVATE_KEY = os.getenv("SNOWFLAKE_PRIVATE_KEY", "")
 SNOWFLAKE_PRIVATE_KEY_PASSPHRASE = os.getenv("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE", "")
+SNOWFLAKE_TOKEN = os.getenv("SNOWFLAKE_TOKEN", "")  # Programmatic Access Token
 ATLAN_HOST = os.getenv("ATLAN_HOST", "https://partner-sandbox.atlan.com")
 ATLAN_API_TOKEN = os.getenv("ATLAN_API_TOKEN", "")
 
@@ -73,17 +74,20 @@ class SnowflakeSession:
             role=SNOWFLAKE_ROLE,
         )
 
-        if SNOWFLAKE_AUTHENTICATOR == "externalbrowser":
+        if SNOWFLAKE_TOKEN and SNOWFLAKE_TOKEN.strip():
+            print("  Using Programmatic Access Token (PAT)...")
+            connect_args["authenticator"] = "oauth"
+            connect_args["token"] = SNOWFLAKE_TOKEN.strip()
+        elif SNOWFLAKE_AUTHENTICATOR == "externalbrowser":
             print("  Opening browser for Snowflake SSO login...")
             connect_args["authenticator"] = "externalbrowser"
-        elif SNOWFLAKE_PRIVATE_KEY:
+        elif SNOWFLAKE_PRIVATE_KEY and SNOWFLAKE_PRIVATE_KEY.strip():
             print("  Using key-pair authentication...")
             passphrase = (
                 SNOWFLAKE_PRIVATE_KEY_PASSPHRASE.encode()
                 if SNOWFLAKE_PRIVATE_KEY_PASSPHRASE
                 else None
             )
-            # Render stores env vars as single-line strings — restore PEM newlines
             pem = SNOWFLAKE_PRIVATE_KEY.replace("\\n", "\n")
             p_key = serialization.load_pem_private_key(
                 pem.encode(),
