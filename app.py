@@ -76,7 +76,7 @@ class SnowflakeSession:
 
         if SNOWFLAKE_TOKEN and SNOWFLAKE_TOKEN.strip():
             print("  Using Programmatic Access Token (PAT)...")
-            connect_args["authenticator"] = "oauth"
+            connect_args["authenticator"] = "programmatic_access_token"
             connect_args["token"] = SNOWFLAKE_TOKEN.strip()
         elif SNOWFLAKE_AUTHENTICATOR == "externalbrowser":
             print("  Opening browser for Snowflake SSO login...")
