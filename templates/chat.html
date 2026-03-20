@@ -312,17 +312,17 @@
         }
     }
 
+    // ── Debug: log ALL incoming postMessages ─────────────────────────
+    window.addEventListener('message', (event) => {
+        console.log('[CortexChat] postMessage received:', event.origin, JSON.stringify(event.data));
+    });
+
     // ── Atlan postMessage listener ───────────────────────────────────
     window.addEventListener('message', async (event) => {
         if (!event.data || typeof event.data !== 'object') return;
 
-        const allowedOrigins = [
-            'https://home.atlan.com',
-            'https://partner-sandbox.atlan.com',
-            'http://localhost:3001',
-            window.location.origin,
-        ];
-        if (!allowedOrigins.includes(event.origin) && event.origin !== window.location.origin) return;
+        // Accept messages from any origin so we can see what Atlan sends
+        console.log('[CortexChat] processing message type:', event.data?.type, 'from:', event.origin);
 
         const { type, payload } = event.data;
 
