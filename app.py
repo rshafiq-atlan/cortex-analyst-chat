@@ -26,12 +26,14 @@ load_dotenv()
 
 app = Flask(__name__)
 
-CORS(app, origins=[
-    "https://home.atlan.com",
-    "https://partner-sandbox.atlan.com",
-    "http://localhost:3001",
-    os.getenv("RENDER_EXTERNAL_URL", ""),
-])
+CORS(app, origins="*")
+
+@app.after_request
+def allow_iframe_embedding(response):
+    """Allow Atlan to embed this app in an iframe."""
+    response.headers.pop("X-Frame-Options", None)
+    response.headers["Content-Security-Policy"] = "frame-ancestors *"
+    return response
 
 # ── Configuration ─────────────────────────────────────────────────────
 SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT", "")
