@@ -329,7 +329,12 @@
 
         if (type === 'ATLAN_HANDSHAKE') {
             handshakeReceived = true;
-            window.parent.postMessage({ type: 'IFRAME_READY', payload: { ready: true } }, event.origin);
+            const appId = payload?.appId || 'cortex-analyst-chat';
+            window.parent.postMessage({
+                type: 'IFRAME_READY',
+                payload: { ready: true, appId: appId }
+            }, event.origin);
+            console.log('[CortexChat] Sent IFRAME_READY with appId:', appId);
             if (isConfigured === undefined) checkConfiguration();
         }
 
@@ -635,7 +640,10 @@
             const parentOrigin = document.referrer
                 ? new URL(document.referrer).origin
                 : 'https://partner-sandbox.atlan.com';
-            window.parent.postMessage({ type: 'IFRAME_READY', payload: { ready: true } }, parentOrigin);
+            window.parent.postMessage({
+                type: 'IFRAME_READY',
+                payload: { ready: true, appId: 'cortex-analyst-chat' }
+            }, parentOrigin);
         }
     }, 500);
 
