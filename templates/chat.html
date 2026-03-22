@@ -286,6 +286,7 @@
     let conversationHistory = [];
     let isConfigured = undefined;
     let handshakeReceived = false;
+    let atlanAuth = { token: null, baseUrl: null };  // Multi-tenant: filled by postMessage
 
     // ── Config check ─────────────────────────────────────────────────
     async function checkConfiguration() {
@@ -333,6 +334,17 @@
         }
 
         else if (type === 'ATLAN_AUTH_CONTEXT') {
+            // Extract Atlan auth for multi-tenant support
+            if (payload) {
+                atlanAuth.token = payload.token || payload.accessToken || null;
+                atlanAuth.baseUrl = payload.tenantUrl || payload.baseUrl || null;
+                // Fallback: derive base URL from the postMessage origin
+                if (!atlanAuth.baseUrl && event.origin) {
+                    atlanAuth.baseUrl = event.origin;
+                }
+                console.log('[CortexChat] Atlan auth context:', atlanAuth.baseUrl, atlanAuth.token ? 'token:yes' : 'token:no');
+            }
+
             if (payload && payload.page && payload.page.params && payload.page.params.id) {
                 const guid = payload.page.params.id;
                 if (isConfigured === undefined) await checkConfiguration();
@@ -361,7 +373,11 @@
         if (!isConfigured) return;
 
         try {
-            const resp = await fetch(`/api/space/${guid}`);
+            // Pass Atlan auth context as headers so the backend can call any tenant
+            const headers = {};
+            if (atlanAuth.token) headers['X-Atlan-Token'] = atlanAuth.token;
+            if (atlanAuth.baseUrl) headers['X-Atlan-Base-Url'] = atlanAuth.baseUrl;
+            const resp = await fetch(`/api/space/${guid}`, { headers });
             const data = await resp.json();
 
             if (data.success) {

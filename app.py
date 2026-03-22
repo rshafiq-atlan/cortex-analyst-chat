@@ -249,18 +249,25 @@ def index():
 
 @app.route("/api/space/<space_guid>")
 def get_space_info(space_guid):
-    """Look up an Atlan asset by GUID via Atlan REST API, read custom metadata."""
-    if not ATLAN_API_TOKEN:
+    """Look up an Atlan asset by GUID via Atlan REST API, read custom metadata.
+
+    Multi-tenant: accepts X-Atlan-Token and X-Atlan-Base-Url headers from
+    the frontend (populated by the ATLAN_AUTH_CONTEXT postMessage). Falls
+    back to env-var config when headers aren't present.
+    """
+    # Prefer per-request auth from postMessage, fall back to env vars
+    atlan_token = request.headers.get("X-Atlan-Token") or ATLAN_API_TOKEN
+    atlan_host = (request.headers.get("X-Atlan-Base-Url") or ATLAN_HOST).rstrip("/")
+
+    if not atlan_token:
         return jsonify({"success": False, "error": "Atlan API not configured."})
 
     try:
         # ── Step 1: Resolve the CM typedef to get attribute ID mappings ──
-        # Atlan stores custom metadata under business-metadata typedefs.
-        # We need to find the attribute IDs for "Cortex Analyst Details".
         typedef_resp = http_requests.get(
-            f"{ATLAN_HOST}/api/meta/types/typedefs?type=business_metadata",
+            f"{atlan_host}/api/meta/types/typedefs?type=business_metadata",
             headers={
-                "Authorization": f"Bearer {ATLAN_API_TOKEN}",
+                "Authorization": f"Bearer {atlan_token}",
                 "Content-Type": "application/json",
             },
             timeout=15,
@@ -279,10 +286,10 @@ def get_space_info(space_guid):
 
         # ── Step 2: Get the asset by GUID ────────────────────────────────
         asset_resp = http_requests.get(
-            f"{ATLAN_HOST}/api/meta/entity/guid/{space_guid}",
+            f"{atlan_host}/api/meta/entity/guid/{space_guid}",
             params={"minExtInfo": "false", "ignoreRelationships": "true"},
             headers={
-                "Authorization": f"Bearer {ATLAN_API_TOKEN}",
+                "Authorization": f"Bearer {atlan_token}",
                 "Content-Type": "application/json",
             },
             timeout=15,
